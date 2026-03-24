@@ -40,8 +40,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
-    // Check if we need to wait due to rate limiting
+
     if (!authProvider.canRetrySignUp()) {
       final waitTime = authProvider.getRemainingWaitTime();
       if (waitTime > 0) {
@@ -50,7 +49,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
     }
-    
+
     final success = await authProvider.signUp(
       email: _emailController.text.trim(),
       password: _passwordController.text,
@@ -65,22 +64,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (success && mounted) {
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
         (route) => false,
       );
     } else if (mounted) {
-      final errorMessage = authProvider.errorMessage ?? 'Registration failed';
-      
-      // If it's a rate limit error, start countdown
+      final error = authProvider.errorMessage ?? 'Registration failed';
       if (authProvider.rateLimitSeconds > 0) {
         _startCountdown(authProvider.rateLimitSeconds);
       }
-      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(errorMessage),
+          content: Text(error),
           backgroundColor: AppTheme.errorColor,
-          duration: authProvider.rateLimitSeconds > 0 
+          duration: authProvider.rateLimitSeconds > 0
               ? Duration(seconds: authProvider.rateLimitSeconds)
               : const Duration(seconds: 4),
         ),
@@ -90,20 +86,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   void _startCountdown(int seconds) {
     _countdownTimer?.cancel();
-    setState(() {
-      _remainingSeconds = seconds;
-    });
-    
+    setState(() => _remainingSeconds = seconds);
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_remainingSeconds <= 1) {
         timer.cancel();
-        setState(() {
-          _remainingSeconds = 0;
-        });
+        setState(() => _remainingSeconds = 0);
       } else {
-        setState(() {
-          _remainingSeconds--;
-        });
+        setState(() => _remainingSeconds--);
       }
     });
   }
@@ -112,7 +101,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Please Wait'),
         content: Text(
           'You can try again in $waitTime seconds. This security measure helps protect our services.',
@@ -130,165 +120,229 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
+        backgroundColor: AppTheme.backgroundColor,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFEDE9FE)),
+            ),
+            child: const Icon(Icons.arrow_back_ios_new, size: 16),
+          ),
           onPressed: () => Navigator.pop(context),
         ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 20),
-                Text(
-                  'Create Account',
-                  style: Theme.of(context).textTheme.displayMedium,
+                const SizedBox(height: 12),
+
+                // Header banner
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.primaryGradient,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.diamond_rounded,
+                        color: Colors.white,
+                        size: 36,
+                      ),
+                      const SizedBox(width: 14),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Create Account',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                          Text(
+                            'Start buying & selling gems',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.8),
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Sign up to start buying and selling gems',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 32),
+
+                const SizedBox(height: 24),
+
+                // Error widget
                 Consumer<AuthProvider>(
-                  builder: (context, authProvider, child) {
-                    if (authProvider.errorMessage != null) {
-                      return ErrorMessageWidget(
-                        message: authProvider.errorMessage!,
-                        showRetryButton: authProvider.rateLimitSeconds == 0 && !authProvider.isLoading,
-                        onRetry: () {
-                          authProvider.clearError();
-                          _handleRegister();
-                        },
+                  builder: (_, auth, __) {
+                    if (auth.errorMessage != null) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: ErrorMessageWidget(
+                          message: auth.errorMessage!,
+                          showRetryButton:
+                              auth.rateLimitSeconds == 0 && !auth.isLoading,
+                          onRetry: () {
+                            auth.clearError();
+                            _handleRegister();
+                          },
+                        ),
                       );
                     }
                     return const SizedBox.shrink();
                   },
                 ),
+
+                _label('Full Name'),
+                const SizedBox(height: 8),
                 TextFormField(
                   controller: _nameController,
+                  textCapitalization: TextCapitalization.words,
                   decoration: const InputDecoration(
-                    labelText: 'Full Name',
-                    hintText: 'Enter your full name',
+                    hintText: 'John Doe',
                     prefixIcon: Icon(Icons.person_outline),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your name';
-                    }
-                    return null;
-                  },
+                  validator: (v) => (v == null || v.isEmpty)
+                      ? 'Please enter your name'
+                      : null,
                 ),
-                const SizedBox(height: 16),
+
+                const SizedBox(height: 18),
+
+                _label('Email Address'),
+                const SizedBox(height: 8),
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(
-                    labelText: 'Email',
-                    hintText: 'Enter your email',
+                    hintText: 'you@example.com',
                     prefixIcon: Icon(Icons.email_outlined),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
+                  validator: (v) {
+                    if (v == null || v.isEmpty)
                       return 'Please enter your email';
-                    }
-                    if (!value.contains('@')) {
-                      return 'Please enter a valid email';
-                    }
+                    if (!v.contains('@')) return 'Please enter a valid email';
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+
+                const SizedBox(height: 18),
+
+                _label('Password'),
+                const SizedBox(height: 8),
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
                   decoration: InputDecoration(
-                    labelText: 'Password',
-                    hintText: 'Enter your password',
+                    hintText: '••••••••',
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword
                             ? Icons.visibility_outlined
                             : Icons.visibility_off_outlined,
+                        size: 20,
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _obscurePassword = !_obscurePassword;
-                        });
-                      },
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your password';
-                    }
-                    if (value.length < 6) {
+                  validator: (v) {
+                    if (v == null || v.isEmpty)
+                      return 'Please enter a password';
+                    if (v.length < 6)
                       return 'Password must be at least 6 characters';
-                    }
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+
+                const SizedBox(height: 18),
+
+                _label('Phone Number (Optional)'),
+                const SizedBox(height: 8),
                 TextFormField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(
-                    labelText: 'Phone Number (Optional)',
-                    hintText: 'Enter your phone number',
+                    hintText: '+1 234 567 8900',
                     prefixIcon: Icon(Icons.phone_outlined),
                   ),
                 ),
-                const SizedBox(height: 16),
+
+                const SizedBox(height: 18),
+
+                _label('Location (Optional)'),
+                const SizedBox(height: 8),
                 TextFormField(
                   controller: _locationController,
                   decoration: const InputDecoration(
-                    labelText: 'Location (Optional)',
-                    hintText: 'Enter your location',
+                    hintText: 'City, Country',
                     prefixIcon: Icon(Icons.location_on_outlined),
                   ),
                 ),
-                const SizedBox(height: 24),
+
+                const SizedBox(height: 32),
+
                 Consumer<AuthProvider>(
-                  builder: (context, authProvider, child) {
-                    final isDisabled = authProvider.isLoading || _remainingSeconds > 0;
-                    
+                  builder: (_, auth, __) {
+                    final isDisabled = auth.isLoading || _remainingSeconds > 0;
                     return SizedBox(
-                      height: 50,
+                      height: 54,
                       child: ElevatedButton(
                         onPressed: isDisabled ? null : _handleRegister,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isDisabled 
-                              ? Colors.grey.shade400
+                          backgroundColor: isDisabled
+                              ? Colors.grey.shade300
                               : AppTheme.primaryColor,
                           foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
-                        child: authProvider.isLoading
+                        child: auth.isLoading
                             ? const SizedBox(
                                 height: 20,
                                 width: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor:
-                                      AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
                               )
                             : Text(
                                 _remainingSeconds > 0
                                     ? 'Wait ${_remainingSeconds}s'
                                     : 'Create Account',
-                                style: const TextStyle(fontSize: 16),
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                       ),
                     );
                   },
                 ),
-                const SizedBox(height: 24),
+
+                const SizedBox(height: 28),
+
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -297,24 +351,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     GestureDetector(
-                      onTap: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const LoginScreen(),
-                          ),
-                        );
-                      },
+                      onTap: () => Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      ),
                       child: Text(
                         'Sign In',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppTheme.primaryColor,
-                              fontWeight: FontWeight.w600,
-                            ),
+                          color: AppTheme.primaryColor,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ],
                 ),
+
+                const SizedBox(height: 32),
               ],
             ),
           ),
@@ -322,4 +374,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
   }
+
+  Widget _label(String text) => Text(
+    text,
+    style: const TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w600,
+      color: AppTheme.textPrimary,
+    ),
+  );
 }

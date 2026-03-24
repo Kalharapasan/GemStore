@@ -28,20 +28,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _loadUserData() {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    if (authProvider.currentUser != null) {
-      _nameController.text = authProvider.currentUser!.fullName ?? '';
-      _phoneController.text = authProvider.currentUser!.phone ?? '';
-      _locationController.text = authProvider.currentUser!.location ?? '';
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (auth.currentUser != null) {
+      _nameController.text = auth.currentUser!.fullName ?? '';
+      _phoneController.text = auth.currentUser!.phone ?? '';
+      _locationController.text = auth.currentUser!.location ?? '';
     }
   }
 
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
+    final auth = Provider.of<AuthProvider>(context, listen: false);
 
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
-    final success = await authProvider.updateProfile(
+    final success = await auth.updateProfile(
       fullName: _nameController.text.trim().isEmpty
           ? null
           : _nameController.text.trim(),
@@ -53,30 +52,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
           : _locationController.text.trim(),
     );
 
-    if (success && mounted) {
-      setState(() {
-        _isEditing = false;
-      });
+    if (!mounted) return;
+    if (success) {
+      setState(() => _isEditing = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Profile updated successfully!'),
+          content: Text('Profile updated!'),
           backgroundColor: AppTheme.successColor,
         ),
       );
-    } else if (mounted) {
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(authProvider.errorMessage ?? 'Failed to update profile'),
+          content: Text(auth.errorMessage ?? 'Failed to update profile'),
           backgroundColor: AppTheme.errorColor,
         ),
       );
     }
   }
 
-  Future<void> _handleSignOut() async {
+  Future<void> _signOut() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Sign Out'),
         content: const Text('Are you sure you want to sign out?'),
         actions: [
@@ -86,6 +85,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.errorColor),
             child: const Text('Sign Out'),
           ),
         ],
@@ -93,12 +93,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     if (confirmed == true && mounted) {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      await authProvider.signOut();
-      
+      await Provider.of<AuthProvider>(context, listen: false).signOut();
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+          MaterialPageRoute(builder: (_) => const WelcomeScreen()),
           (route) => false,
         );
       }
@@ -108,214 +106,278 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
         title: const Text('Profile'),
+        backgroundColor: AppTheme.backgroundColor,
         actions: [
           if (!_isEditing)
-            IconButton(
-              icon: const Icon(Icons.edit),
+            TextButton.icon(
               onPressed: () {
                 _loadUserData();
-                setState(() {
-                  _isEditing = true;
-                });
+                setState(() => _isEditing = true);
               },
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              label: const Text('Edit'),
             ),
         ],
       ),
       body: Consumer<AuthProvider>(
-        builder: (context, authProvider, child) {
-          final user = authProvider.currentUser;
-          
+        builder: (context, auth, _) {
+          final user = auth.currentUser;
           if (user == null) {
             return const Center(
-              child: CircularProgressIndicator(),
+              child: CircularProgressIndicator(color: AppTheme.primaryColor),
             );
           }
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(20),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const SizedBox(height: 20),
-                CircleAvatar(
-                  radius: 60,
-                  backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
-                  child: Icon(
-                    Icons.person,
-                    size: 60,
-                    color: AppTheme.primaryColor,
+                // Avatar & name card
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.primaryGradient,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.2),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.4),
+                            width: 2,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            (user.fullName ?? 'U')
+                                .substring(0, 1)
+                                .toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 34,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              fontFamily: 'serif',
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        user.fullName ?? 'No name',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        user.email,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.white.withOpacity(0.8),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+
                 const SizedBox(height: 16),
-                Text(
-                  user.fullName ?? 'No name',
-                  style: Theme.of(context).textTheme.displaySmall,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  user.email,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
-                ),
-                const SizedBox(height: 32),
-                if (_isEditing) ...[
-                  Form(
-                    key: _formKey,
-                    child: Column(
+
+                // Stats
+                Consumer<GemProvider>(
+                  builder: (_, gp, __) => Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFEDE9FE)),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        TextFormField(
-                          controller: _nameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Full Name',
-                            prefixIcon: Icon(Icons.person_outline),
-                          ),
+                        _stat(
+                          '${gp.myGems.length}',
+                          'Listings',
+                          AppTheme.primaryColor,
                         ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _phoneController,
-                          decoration: const InputDecoration(
-                            labelText: 'Phone Number',
-                            prefixIcon: Icon(Icons.phone_outlined),
-                          ),
-                          keyboardType: TextInputType.phone,
+                        Container(
+                          width: 1,
+                          height: 40,
+                          color: const Color(0xFFEDE9FE),
                         ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _locationController,
-                          decoration: const InputDecoration(
-                            labelText: 'Location',
-                            prefixIcon: Icon(Icons.location_on_outlined),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _isEditing = false;
-                                  });
-                                },
-                                child: const Text('Cancel'),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: authProvider.isLoading ? null : _saveProfile,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.primaryColor,
-                                  foregroundColor: Colors.white,
-                                ),
-                                child: authProvider.isLoading
-                                    ? const SizedBox(
-                                        height: 20,
-                                        width: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(Colors.white),
-                                        ),
-                                      )
-                                    : const Text('Save'),
-                              ),
-                            ),
-                          ],
+                        _stat(
+                          '${gp.favoriteGems.length}',
+                          'Favorites',
+                          AppTheme.secondaryColor,
                         ),
                       ],
                     ),
                   ),
-                ] else ...[
-                  _buildInfoCard(
-                    icon: Icons.phone,
-                    label: 'Phone',
-                    value: user.phone ?? 'Not provided',
+                ),
+
+                const SizedBox(height: 16),
+
+                // Info / Edit form
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFEDE9FE)),
                   ),
-                  const SizedBox(height: 12),
-                  _buildInfoCard(
-                    icon: Icons.location_on,
-                    label: 'Location',
-                    value: user.location ?? 'Not provided',
-                  ),
-                  const SizedBox(height: 12),
-                  _buildInfoCard(
-                    icon: Icons.calendar_today,
-                    label: 'Member since',
-                    value: '${user.createdAt.year}-${user.createdAt.month.toString().padLeft(2, '0')}-${user.createdAt.day.toString().padLeft(2, '0')}',
-                  ),
-                ],
-                const SizedBox(height: 32),
-                Consumer<GemProvider>(
-                  builder: (context, gemProvider, child) {
-                    return Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  padding: const EdgeInsets.all(20),
+                  child: _isEditing
+                      ? Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const Text(
+                                'Edit Profile',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              TextFormField(
+                                controller: _nameController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Full Name',
+                                  prefixIcon: Icon(Icons.person_outline),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              TextFormField(
+                                controller: _phoneController,
+                                keyboardType: TextInputType.phone,
+                                decoration: const InputDecoration(
+                                  labelText: 'Phone Number',
+                                  prefixIcon: Icon(Icons.phone_outlined),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              TextFormField(
+                                controller: _locationController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Location',
+                                  prefixIcon: Icon(Icons.location_on_outlined),
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: () =>
+                                          setState(() => _isEditing = false),
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 14,
+                                        ),
+                                      ),
+                                      child: const Text('Cancel'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: auth.isLoading
+                                          ? null
+                                          : _saveProfile,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.primaryColor,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 14,
+                                        ),
+                                      ),
+                                      child: auth.isLoading
+                                          ? const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                      Color
+                                                    >(Colors.white),
+                                              ),
+                                            )
+                                          : const Text('Save'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        )
+                      : Column(
                           children: [
-                            Column(
-                              children: [
-                                Text(
-                                  '${gemProvider.myGems.length}',
-                                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                                        color: AppTheme.primaryColor,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                            const Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'Account Details',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.textPrimary,
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'My Gems',
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                ),
-                              ],
+                              ),
                             ),
-                            Container(
-                              width: 1,
-                              height: 50,
-                              color: Colors.grey[300],
+                            const SizedBox(height: 14),
+                            _infoRow(
+                              Icons.phone_outlined,
+                              'Phone',
+                              user.phone ?? 'Not set',
                             ),
-                            Column(
-                              children: [
-                                Text(
-                                  '${gemProvider.favoriteGems.length}',
-                                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                                        color: AppTheme.secondaryColor,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Favorites',
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                ),
-                              ],
+                            _divider(),
+                            _infoRow(
+                              Icons.location_on_outlined,
+                              'Location',
+                              user.location ?? 'Not set',
+                            ),
+                            _divider(),
+                            _infoRow(
+                              Icons.calendar_today_outlined,
+                              'Member since',
+                              '${user.createdAt.year}-${user.createdAt.month.toString().padLeft(2, '0')}-${user.createdAt.day.toString().padLeft(2, '0')}',
                             ),
                           ],
                         ),
-                      ),
-                    );
-                  },
                 ),
-                const SizedBox(height: 32),
+
+                const SizedBox(height: 20),
+
+                // Sign out
                 SizedBox(
                   width: double.infinity,
+                  height: 52,
                   child: OutlinedButton.icon(
-                    onPressed: _handleSignOut,
-                    icon: const Icon(Icons.logout),
+                    onPressed: _signOut,
+                    icon: const Icon(Icons.logout_rounded, size: 18),
                     label: const Text('Sign Out'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.errorColor,
                       side: const BorderSide(color: AppTheme.errorColor),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 32),
+
+                const SizedBox(height: 40),
               ],
             ),
           );
@@ -324,39 +386,68 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildInfoCard({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            Icon(icon, color: AppTheme.primaryColor),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textSecondary,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    value,
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                ],
-              ),
-            ),
-          ],
+  Widget _stat(String value, String label, Color color) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.w900,
+            color: color,
+          ),
         ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+        ),
+      ],
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: AppTheme.primaryColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.textHint,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
+
+  Widget _divider() => const Divider(height: 1, color: Color(0xFFF0EBFF));
 }

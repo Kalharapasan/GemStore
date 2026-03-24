@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
+import '../../config/theme.dart';
 import '../../providers/gem_provider.dart';
 import '../../widgets/gem_card.dart';
 import '../gem_detail_screen.dart';
@@ -11,34 +11,50 @@ class FavoritesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
         title: const Text('Favorites'),
+        backgroundColor: AppTheme.backgroundColor,
       ),
       body: Consumer<GemProvider>(
-        builder: (context, gemProvider, child) {
-          final favoriteGems = gemProvider.favoriteGems;
+        builder: (context, gemProvider, _) {
+          final favs = gemProvider.favoriteGems;
 
-          if (favoriteGems.isEmpty) {
+          if (favs.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.favorite_border,
-                    size: 80,
-                    color: Colors.grey[400],
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFFF0F6),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.favorite_border_rounded,
+                      size: 40,
+                      color: AppTheme.secondaryColor,
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  Text(
+                  const SizedBox(height: 20),
+                  const Text(
                     'No favorites yet',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.grey[600],
-                        ),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    'Start adding gems to your favorites!',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                  const Text(
+                    'Tap the heart icon on any gem\nto save it here.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -46,26 +62,22 @@ class FavoritesScreen extends StatelessWidget {
           }
 
           return GridView.builder(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              childAspectRatio: 0.75,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
+              childAspectRatio: 0.72,
+              crossAxisSpacing: 14,
+              mainAxisSpacing: 14,
             ),
-            itemCount: favoriteGems.length,
+            itemCount: favs.length,
             itemBuilder: (context, index) {
-              final gem = favoriteGems[index];
+              final gem = favs[index];
               return GemCard(
                 gem: gem,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => GemDetailScreen(gem: gem),
-                    ),
-                  );
-                },
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => GemDetailScreen(gem: gem)),
+                ),
               );
             },
           );
